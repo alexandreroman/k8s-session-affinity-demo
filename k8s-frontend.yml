@@ -1,0 +1,78 @@
+# Do not deploy these resources on the same cluster where the backend is running.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: alexandreroman/k8s-session-affinity-frontend
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        env:
+        - name: BACKEND_HOST
+          value: backend
+        - name: BACKEND_PORT
+          value: "9000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-lb
+  namespace: frontend
+  labels:
+    app: frontend
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: frontend
+spec:
+  # Try disabling sessionAffinity (comment this property),
+  # and see how different backend hosts are targeted.
+  sessionAffinity: ClientIP
+  ports:
+  - protocol: TCP
+    port: 9000
+    targetPort: 9000
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: backend
+  namespace: frontend
+subsets:
+  - addresses:
+    # Replace these IPs with your public backend endpoint IPs.
+    # Get endpoint IPs by running: $ kubectl -n backend get svc
+    # Warning: your backend endpoints must run in a different K8s cluster.
+    - ip: 34.76.187.102
+    - ip: 34.76.93.247
+    ports:
+    - port: 80
